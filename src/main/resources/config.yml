@@ -1,0 +1,12 @@
+engine:
+  evaluation-interval: 30s
+
+phases:
+  - id: early
+    duration: 3d
+
+  - id: mid
+    duration: 7d
+
+  - id: late
+    duration: infinite

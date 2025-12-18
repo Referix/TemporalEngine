@@ -1,0 +1,4 @@
+name: TemporalEngine
+version: '1.0-SNAPSHOT'
+main: org.referix.temporalEngine.TemporalEngine
+api-version: '1.21'
