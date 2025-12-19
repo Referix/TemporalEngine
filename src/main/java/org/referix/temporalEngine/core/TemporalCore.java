@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class TemporalCore {
 
@@ -56,16 +57,44 @@ public final class TemporalCore {
         phaseStartedAt = now;
     }
 
+
+
     public TimePhase getCurrentPhase() {
         return phases.get(currentPhaseIndex);
     }
 
-    public Instant getPhaseStartedAt() {
-        return phaseStartedAt;
+    public Optional<TimePhase> getPreviousPhase() {
+        if (currentPhaseIndex <= 0) {
+            return Optional.empty();
+        }
+        return Optional.of(phases.get(currentPhaseIndex - 1));
     }
 
-    public int getCurrentPhaseIndex() {
-        return currentPhaseIndex;
+    public Optional<TimePhase> getNextPhase() {
+        if (currentPhaseIndex >= phases.size() - 1) {
+            return Optional.empty();
+        }
+        return Optional.of(phases.get(currentPhaseIndex + 1));
     }
+
+    public Duration getElapsedInCurrentPhase(Instant now) {
+        return Duration.between(phaseStartedAt, now);
+    }
+
+    public Optional<Duration> getRemainingInCurrentPhase(Instant now) {
+        TimePhase current = getCurrentPhase();
+
+        if (current.isInfinite()) {
+            return Optional.empty();
+        }
+
+        Duration elapsed = getElapsedInCurrentPhase(now);
+        Duration remaining = current.getDuration().minus(elapsed);
+
+        return remaining.isNegative()
+                ? Optional.of(Duration.ZERO)
+                : Optional.of(remaining);
+    }
+
 }
 
