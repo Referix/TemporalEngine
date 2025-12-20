@@ -2,3 +2,7 @@ name: TemporalEngine
 version: '1.0-SNAPSHOT'
 main: org.referix.temporalEngine.TemporalEngine
 api-version: '1.21'
+libraries:
+  - org.xerial:sqlite-jdbc:3.50.3.0
+  - com.j256.ormlite:ormlite-jdbc:6.1
+  - com.j256.ormlite:ormlite-core:6.1

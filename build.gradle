@@ -16,6 +16,12 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT")
+
+    // https://mvnrepository.com/artifact/com.j256.ormlite/ormlite-core
+    implementation("com.j256.ormlite:ormlite-core:6.1")
+    implementation("org.xerial:sqlite-jdbc:3.50.3.0")
+    // https://mvnrepository.com/artifact/com.j256.ormlite/ormlite-jdbc
+    implementation("com.j256.ormlite:ormlite-jdbc:6.1")
 }
 
 tasks {

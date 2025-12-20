@@ -1,82 +1,71 @@
 package org.referix.temporalEngine.engine.phase;
 
-
 import org.referix.temporalEngine.api.event.PhaseChangeEvent;
 import org.referix.temporalEngine.api.event.PhaseEndEvent;
 import org.referix.temporalEngine.api.event.PhaseStartEvent;
 import org.referix.temporalEngine.api.phase.Phase;
 import org.referix.temporalEngine.core.TemporalCore;
 import org.referix.temporalEngine.engine.api.TemporalAPIImpl;
+import org.referix.temporalEngine.engine.persistence.AutosaveStrategy;
+import org.referix.temporalEngine.engine.persistence.TemporalSnapshot;
+import org.referix.temporalEngine.engine.persistence.TemporalStateStore;
 import org.referix.temporalEngine.periphery.config.TimePhase;
 
 import java.time.Instant;
-import java.util.Objects;
 
 public final class TemporalPhaseCoordinator {
 
     private final TemporalCore core;
     private final TemporalAPIImpl api;
+    private final TemporalStateStore store;
+    private final AutosaveStrategy autosave;
 
     public TemporalPhaseCoordinator(
             TemporalCore core,
-            TemporalAPIImpl api
+            TemporalAPIImpl api,
+            TemporalStateStore store,
+            AutosaveStrategy autosave
     ) {
-        this.core = Objects.requireNonNull(core, "core");
-        this.api = Objects.requireNonNull(api, "api");
+        this.core = core;
+        this.api = api;
+        this.store = store;
+        this.autosave = autosave;
+
+        // restore on startup
+        store.load().ifPresent(snapshot ->
+                core.restorePhase(
+                        snapshot.phaseId(),
+                        snapshot.phaseStartedAt()
+                )
+        );
     }
 
-    /**
-     * Викликається engine'ом замість прямого core.evaluate()
-     */
     public void evaluate(Instant now) {
-        Objects.requireNonNull(now, "now");
+        var before = core.getCurrentPhase();
 
-        // 1. Запамʼятовуємо фазу ДО
-        TimePhase before = core.getCurrentPhase();
-
-        // 2. Даємо core виконати свою логіку
         core.evaluate(now);
 
-        // 3. Беремо фазу ПІСЛЯ
-        TimePhase after = core.getCurrentPhase();
-
-        // 4. Якщо фаза не змінилась — нічого не робимо
-        if (before == after) {
-            return;
+        if (autosave.shouldSave(now)) {
+            store.save(new TemporalSnapshot(
+                    core.getCurrentPhase().getId(),
+                    core.getPhaseStartedAt()
+            ));
         }
 
-        // 5. Перетворюємо core-фази в API-фази
-        Phase from = toApiPhase(before);
-        Phase to = toApiPhase(after);
+        var after = core.getCurrentPhase();
+        if (before == after) return;
 
-        // 6. Створюємо події
-        PhaseEndEvent endEvent =
-                new PhaseEndEvent(from, now);
-
-        PhaseStartEvent startEvent =
-                new PhaseStartEvent(to, now);
-
-        PhaseChangeEvent changeEvent =
-                new PhaseChangeEvent(from, to, now);
-
-        // 7. Розсилаємо події слухачам
-        dispatch(endEvent, startEvent, changeEvent);
+        dispatch(before, after, now);
     }
 
-    private void dispatch(
-            PhaseEndEvent end,
-            PhaseStartEvent start,
-            PhaseChangeEvent change
-    ) {
-        for (var listener : api.listeners()) {
-            listener.onPhaseEnd(end);
-            listener.onPhaseStart(start);
-            listener.onPhaseChange(change);
+    private void dispatch(TimePhase before, TimePhase after, Instant now) {
+        Phase from = new Phase(before.getId(), before.getDuration());
+        Phase to = new Phase(after.getId(), after.getDuration());
+
+        for (var l : api.listeners()) {
+            l.onPhaseEnd(new PhaseEndEvent(from, now));
+            l.onPhaseStart(new PhaseStartEvent(to, now));
+            l.onPhaseChange(new PhaseChangeEvent(from, to, now));
         }
-    }
-
-    private Phase toApiPhase(TimePhase phase) {
-        return new Phase(phase.getId(), phase.getDuration());
     }
 }
-

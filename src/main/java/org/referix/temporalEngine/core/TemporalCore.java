@@ -96,5 +96,32 @@ public final class TemporalCore {
                 : Optional.of(remaining);
     }
 
+
+    // ОБОВʼЯЗКОВО для persistence
+    public Instant getPhaseStartedAt() {
+        return phaseStartedAt;
+    }
+
+    // ОБОВʼЯЗКОВО для restore
+    public void restorePhase(String phaseId, Instant startedAt) {
+        Objects.requireNonNull(phaseId, "phaseId");
+        Objects.requireNonNull(startedAt, "startedAt");
+
+        for (int i = 0; i < phases.size(); i++) {
+            TimePhase phase = phases.get(i);
+            if (phase.getId().equals(phaseId)) {
+                this.currentPhaseIndex = i;
+                this.phaseStartedAt = startedAt;
+                return;
+            }
+        }
+
+        throw new IllegalStateException(
+                "Cannot restore TemporalCore: unknown phaseId = " + phaseId
+        );
+    }
+
+
+
 }
 
