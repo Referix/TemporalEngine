@@ -47,7 +47,7 @@ public final class TemporalPhaseCoordinator {
 
         if (autosave.shouldSave(now)) {
             store.save(new TemporalSnapshot(
-                    core.getCurrentPhase().getId(),
+                    core.getCurrentPhase().id(),
                     core.getPhaseStartedAt()
             ));
         }
@@ -59,8 +59,8 @@ public final class TemporalPhaseCoordinator {
     }
 
     private void dispatch(TimePhase before, TimePhase after, Instant now) {
-        Phase from = new Phase(before.getId(), before.getDuration());
-        Phase to = new Phase(after.getId(), after.getDuration());
+        Phase from = new Phase(before.id(), before.duration());
+        Phase to = new Phase(after.id(), after.duration());
 
         for (var l : api.listeners()) {
             l.onPhaseEnd(new PhaseEndEvent(from, now));

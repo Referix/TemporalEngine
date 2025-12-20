@@ -22,15 +22,11 @@ public final class TemporalCore {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(startTime, "startTime");
 
-        this.phases = config.getPhases();
+        this.phases = config.phases();
         this.currentPhaseIndex = 0;
         this.phaseStartedAt = startTime;
     }
 
-    /**
-     * Основний метод оцінки.
-     * Викликається engine'ом періодично.
-     */
     public void evaluate(Instant now) {
         Objects.requireNonNull(now, "now");
 
@@ -43,7 +39,7 @@ public final class TemporalCore {
 
         Duration elapsed = Duration.between(phaseStartedAt, now);
 
-        if (elapsed.compareTo(current.getDuration()) >= 0) {
+        if (elapsed.compareTo(current.duration()) >= 0) {
             advanceToNextPhase(now);
         }
     }
@@ -89,7 +85,7 @@ public final class TemporalCore {
         }
 
         Duration elapsed = getElapsedInCurrentPhase(now);
-        Duration remaining = current.getDuration().minus(elapsed);
+        Duration remaining = current.duration().minus(elapsed);
 
         return remaining.isNegative()
                 ? Optional.of(Duration.ZERO)
@@ -109,7 +105,7 @@ public final class TemporalCore {
 
         for (int i = 0; i < phases.size(); i++) {
             TimePhase phase = phases.get(i);
-            if (phase.getId().equals(phaseId)) {
+            if (phase.id().equals(phaseId)) {
                 this.currentPhaseIndex = i;
                 this.phaseStartedAt = startedAt;
                 return;

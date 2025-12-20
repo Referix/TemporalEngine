@@ -1,5 +1,15 @@
 engine:
+  enabled: true                 # hard kill-switch
+  mode: ACTIVE                  # ACTIVE | OBSERVE
   evaluation-interval: 30s
+
+autosave:
+  enabled: true
+  interval: 30m                 # як Duration.parse-friendly
+
+persistence:
+  enabled: true                 # future-proof
+  strict-restore: false         # false = при помилці reset
 
 phases:
   - id: early

@@ -46,7 +46,7 @@ public final class PhaseTimelineImpl implements PhaseTimeline {
     }
 
     private Phase toApiPhase(TimePhase phase) {
-        return new Phase(phase.getId(), phase.getDuration());
+        return new Phase(phase.id(), phase.duration());
     }
 }
 

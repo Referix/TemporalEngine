@@ -1,71 +1,88 @@
 package org.referix.temporalEngine.periphery.config.factory;
 
-import org.referix.temporalEngine.periphery.config.loader.RawConfig;
+import org.referix.temporalEngine.periphery.config.loader.*;
+
 import java.time.Duration;
 import java.util.List;
-import java.util.Objects;
 
-public class TemporalConfigFactory {
+public final class TemporalConfigFactory {
 
     public IntermediateConfig create(RawConfig raw) {
-        Objects.requireNonNull(raw, "raw");
 
-        // 1. Parse evaluationInterval
-        Duration evaluationInterval = parseDuration(raw.getEvaluationInterval());
+        EngineMode mode;
+        try {
+            mode = EngineMode.valueOf(raw.engine().mode().toUpperCase());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid engine.mode");
+        }
 
-        // 2. Convert Duration → ticks
-        long evaluationIntervalTicks = durationToTicks(evaluationInterval);
+        Duration evaluationInterval = parseDuration(raw.engine().evaluationInterval());
+        long ticks = evaluationInterval.toMillis() / 50;
 
-        // 3. Parse phases
-        List<PhaseData> phases = raw.getPhases().stream()
-                .map(map -> new PhaseData(
-                        map.get("id"),
-                        parseDurationOrNull(map.get("duration"))
-                ))
+        Duration autosaveInterval = null;
+        if (raw.autosave().enabled()) {
+            autosaveInterval = parseDuration(raw.autosave().interval());
+        }
+
+        List<PhaseData> phases = raw.phases().stream()
+                .map(this::parsePhase)
                 .toList();
 
         return new IntermediateConfig(
+                raw.engine().enabled(),
+                mode,
                 evaluationInterval,
-                evaluationIntervalTicks,
+                ticks,
+                raw.autosave().enabled(),
+                autosaveInterval,
+                raw.persistence().enabled(),
+                raw.persistence().strictRestore(),
                 phases
         );
     }
 
-    // ===== HELPER METHODS =====
+    private PhaseData parsePhase(java.util.Map<String, String> map) {
+        String id = map.get("id");
+        String rawDuration = map.get("duration");
+
+        if (id == null) {
+            throw new IllegalArgumentException("Phase id is missing");
+        }
+
+        if ("infinite".equalsIgnoreCase(rawDuration)) {
+            return new PhaseData(id, null);
+        }
+
+        return new PhaseData(id, parseDuration(rawDuration));
+    }
 
     private Duration parseDuration(String raw) {
-        if (raw == null) throw new IllegalArgumentException("Duration cannot be null");
+        if (raw == null) return null;
+
         raw = raw.trim().toLowerCase();
 
         if (raw.equals("infinite")) {
             return null;
         }
 
-        // regex: (\d+)([smhd])
-        var matcher = java.util.regex.Pattern.compile("(\\d+)([smhd])").matcher(raw);
-        if (!matcher.matches()) {
-            throw new IllegalArgumentException("Invalid duration format: " + raw);
+        // підтримка d/h/m/s
+        if (raw.endsWith("d")) {
+            long val = Long.parseLong(raw.substring(0, raw.length() - 1));
+            return Duration.ofDays(val);
+        } else if (raw.endsWith("h")) {
+            long val = Long.parseLong(raw.substring(0, raw.length() - 1));
+            return Duration.ofHours(val);
+        } else if (raw.endsWith("m")) {
+            long val = Long.parseLong(raw.substring(0, raw.length() - 1));
+            return Duration.ofMinutes(val);
+        } else if (raw.endsWith("s")) {
+            long val = Long.parseLong(raw.substring(0, raw.length() - 1));
+            return Duration.ofSeconds(val);
+        } else {
+            // fallback: пробуємо Duration.parse
+            return Duration.parse(raw);
         }
-
-        long value = Long.parseLong(matcher.group(1));
-        String unit = matcher.group(2);
-
-        return switch (unit) {
-            case "s" -> Duration.ofSeconds(value);
-            case "m" -> Duration.ofMinutes(value);
-            case "h" -> Duration.ofHours(value);
-            case "d" -> Duration.ofDays(value);
-            default -> throw new IllegalArgumentException("Unknown time unit: " + unit);
-        };
     }
 
-    private Duration parseDurationOrNull(String raw) {
-        if (raw == null) return null;
-        return parseDuration(raw);
-    }
-
-    private long durationToTicks(Duration duration) {
-        if (duration == null) return Long.MAX_VALUE; // infinite → effectively "never"
-        return duration.getSeconds() * 20; // 20 ticks per second
-    }
 }
+

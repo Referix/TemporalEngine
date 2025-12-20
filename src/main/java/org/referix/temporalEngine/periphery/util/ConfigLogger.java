@@ -12,14 +12,14 @@ public final class ConfigLogger {
 
         plugin.getLogger().info("=== TemporalEngine Config Loaded ===");
         plugin.getLogger().info(
-                "Evaluation interval: " + config.getEvaluationInterval()
+                "Evaluation interval: " + config.engine().evaluationInterval()
         );
 
-        for (TimePhase phase : config.getPhases()) {
+        for (TimePhase phase : config.phases()) {
             plugin.getLogger().info(
-                    "Phase: " + phase.getId() +
+                    "Phase: " + phase.id() +
                             " | duration: " +
-                            (phase.isInfinite() ? "infinite" : phase.getDuration())
+                            (phase.isInfinite() ? "infinite" : phase.duration())
             );
         }
     }

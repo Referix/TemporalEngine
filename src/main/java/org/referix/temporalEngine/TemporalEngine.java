@@ -17,8 +17,6 @@ import org.referix.temporalEngine.periphery.config.factory.IntermediateConfig;
 import org.referix.temporalEngine.periphery.config.factory.TemporalConfigFactory;
 import org.referix.temporalEngine.periphery.config.loader.RawConfig;
 import org.referix.temporalEngine.periphery.config.loader.TemporalConfigLoader;
-import org.referix.temporalEngine.periphery.config.validators.ConfigException;
-import org.referix.temporalEngine.periphery.config.validators.TemporalConfigValidator;
 import org.referix.temporalEngine.periphery.util.ConfigLogger;
 import org.referix.temporalEngine.persistence.sqlite.OrmLiteBootstrap;
 import org.referix.temporalEngine.persistence.sqlite.SqliteTemporalStateStore;
@@ -37,34 +35,63 @@ public final class TemporalEngine extends JavaPlugin {
 
         try {
             // 1️⃣ Load config
-            TemporalCoreConfig coreConfig = loadCoreConfig();
-            TemporalCore core = new TemporalCore(coreConfig, Instant.now());
+            TemporalCoreConfig config = loadCoreConfig();
 
-            // 2️⃣ Persistence
-            connectionSource = OrmLiteBootstrap.init(getDataFolder());
-            TemporalStateStore stateStore = new SqliteTemporalStateStore(connectionSource);
+            if (!config.engine().enabled()) {
+                getLogger().warning("TemporalEngine disabled via config.");
+                return;
+            }
 
-            // Restore previous state if exists
-            stateStore.load().ifPresent(snapshot ->
-                    core.restorePhase(snapshot.phaseId(), snapshot.phaseStartedAt())
-            );
+            TemporalCore core = new TemporalCore(config, Instant.now());
+
+            // 2️⃣ Persistence (optional)
+            TemporalStateStore stateStore = TemporalStateStore.noop();
+
+            if (config.persistence().enabled()) {
+                connectionSource = OrmLiteBootstrap.init(getDataFolder());
+                stateStore = new SqliteTemporalStateStore(connectionSource);
+
+                try {
+                    stateStore.load().ifPresent(snapshot ->
+                            core.restorePhase(snapshot.phaseId(), snapshot.phaseStartedAt())
+                    );
+                } catch (Exception e) {
+                    if (config.persistence().strictRestore()) {
+                        throw e;
+                    } else {
+                        getLogger().warning("Failed to restore state, starting fresh.");
+                    }
+                }
+            }
 
             // 3️⃣ API
             TemporalAPIImpl api = initializeApi(core);
 
-            // 4️⃣ Coordinator + autosave
-            AutosaveStrategy autosave = new FixedIntervalAutosave(Duration.ofMinutes(30));
+            // 4️⃣ Autosave (optional)
+            AutosaveStrategy autosave = AutosaveStrategy.disabled();
+
+            if (config.autosave().enabled()) {
+                autosave = new FixedIntervalAutosave(
+                        config.autosave().interval()
+                );
+            }
+
+            // 5️⃣ Coordinator
             TemporalPhaseCoordinator coordinator =
                     new TemporalPhaseCoordinator(core, api, stateStore, autosave);
 
-            // 5️⃣ Runner
-            runner = new TemporalEngineRunner(this, coordinator, coreConfig.getEvaluationIntervalTick());
+            // 6️⃣ Runner
+            runner = new TemporalEngineRunner(
+                    this,
+                    coordinator,
+                    config.engine().evaluationIntervalTicks()
+            );
 
-            // 6️⃣ Bridge
+            // 7️⃣ Bridge
             TemporalBukkitBridge bridge = new TemporalBukkitBridge(this);
             api.registerListener(bridge);
 
-            // 7️⃣ Start
+            // 8️⃣ Start
             runner.start();
             getLogger().info("TemporalEngine successfully started.");
 
@@ -72,6 +99,7 @@ public final class TemporalEngine extends JavaPlugin {
             failStartup(e);
         }
     }
+
 
     @Override
     public void onDisable() {
@@ -95,7 +123,6 @@ public final class TemporalEngine extends JavaPlugin {
         RawConfig raw = loader.load(getConfig());
         TemporalConfigFactory factory = new TemporalConfigFactory();
         IntermediateConfig intermediate = factory.create(raw);
-        new TemporalConfigValidator().validate(intermediate);
         TemporalCoreConfig config = new TemporalCoreConfigBuilder().build(intermediate);
         ConfigLogger.log(this, config);
         return config;

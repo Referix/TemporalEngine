@@ -1,26 +1,38 @@
 package org.referix.temporalEngine.periphery.config.loader;
 
-
 import org.bukkit.configuration.file.FileConfiguration;
+
 
 import java.util.List;
 import java.util.Map;
 
-public class TemporalConfigLoader {
+public final class TemporalConfigLoader {
 
     public RawConfig load(FileConfiguration config) {
 
-        String evaluationInterval =
-                config.getString("engine.evaluation-interval");
+        RawEngineConfig engine = new RawEngineConfig(
+                config.getBoolean("engine.enabled"),
+                config.getString("engine.mode"),
+                config.getString("engine.evaluation-interval")
+        );
 
-        List<Map<?, ?>> rawPhases =
-                config.getMapList("phases");
+        RawAutosaveConfig autosave = new RawAutosaveConfig(
+                config.getBoolean("autosave.enabled"),
+                config.getString("autosave.interval")
+        );
 
-        // Приводимо Map<?, ?> → Map<String, String>
-        List<Map<String, String>> phases = rawPhases.stream()
-                .map(map -> (Map<String, String>) map)
-                .toList();
+        RawPersistenceConfig persistence = new RawPersistenceConfig(
+                config.getBoolean("persistence.enabled"),
+                config.getBoolean("persistence.strict-restore")
+        );
 
-        return new RawConfig(evaluationInterval, phases);
+        List<Map<String, String>> phases =
+                config.getMapList("phases").stream()
+                        .map(m -> (Map<String, String>) m)
+                        .toList();
+
+        return new RawConfig(engine, autosave, persistence, phases);
     }
 }
+
+
